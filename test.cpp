@@ -39,9 +39,7 @@ int main() {
     // std::cout << std::accumulate(vec2.begin(), vec2.end(), 0) << std::endl;
     // std::cout << std::accumulate(vec3.begin(), vec3.end(), 0) << std::endl;
 
-    for (int i = 0; i < 4; ++i) {
-        std::cout << timer.get_cycle(i) << std::endl;
+    for (size_t i = 0; i < timer.size(); ++i) {
+        std::cout << timer.get(i).count() << std::endl;
     }
-
-    timer.dump();
 }

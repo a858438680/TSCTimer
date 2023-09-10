@@ -1,15 +1,12 @@
 
 #pragma once
 
-#include <chrono>
+#include <atomic>
 #include <bitset>
+#include <chrono>
 #include <vector>
 
 #include <cstring>
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <cpuid.h>
 
 struct TSCTimerHelper {
     static uint64_t average(uint64_t low, uint64_t high) {
@@ -52,28 +49,28 @@ struct TSCTimerHelper {
         auto [end_tsc, end_time] = TSCTimerHelper::get_tsc_ns_pair();
         auto& [begin_tsc, begin_time] = TSCTimerHelper::base_point;
         std::chrono::nanoseconds duration = end_time - begin_time;
-        cycle_to_ns_scale = static_cast<double>(duration.count()) / static_cast<double>(end_tsc - begin_tsc);
+        auto scale = static_cast<double>(duration.count()) / static_cast<double>(end_tsc - begin_tsc);
+        double expected = 0.;
+        cycle_to_ns_scale.compare_exchange_strong(expected, scale, std::memory_order_relaxed);
     }
 
     static std::tuple<uint64_t, std::chrono::steady_clock::time_point> base_point;
-    static double cycle_to_ns_scale;
+    static std::atomic<double> cycle_to_ns_scale;
 };
 
 inline std::tuple<uint64_t, std::chrono::steady_clock::time_point> TSCTimerHelper::base_point = TSCTimerHelper::get_tsc_ns_pair();
-inline double TSCTimerHelper::cycle_to_ns_scale = 0.;
+inline std::atomic<double> TSCTimerHelper::cycle_to_ns_scale{0.};
 
 template <int N, typename Period = std::ratio<1>, typename Rep = double>
 class TSCTimer: protected TSCTimerHelper {
 public:
     TSCTimer() {
-        memset(&last_tsc_arr_, 0, sizeof(last_tsc_arr_));
         memset(&cycles_arr_, 0, sizeof(cycles_arr_));
     }
 
     template <typename... Ns>
     void track(Ns... track_types) {
         auto tsc = TSCTimerHelper::rdtsc();
-        tsc_record_.push_back(tsc);
         constexpr auto num_types = sizeof...(Ns);
         int num_types_arr[num_types] = {track_types...};
         std::bitset<N> now_tracking;
@@ -95,28 +92,27 @@ public:
     }
 
     std::chrono::duration<Rep, Period> get(int i) {
-        if (TSCTimerHelper::cycle_to_ns_scale == 0.) {
+        auto scale = TSCTimerHelper::cycle_to_ns_scale.load(std::memory_order_relaxed);
+        if (scale == 0.) {
             TSCTimerHelper::calibrate();
+            while ((scale = TSCTimerHelper::cycle_to_ns_scale.load(std::memory_order_relaxed)) == 0.);
         }
-        std::chrono::nanoseconds result{static_cast<std::chrono::nanoseconds::rep>(cycles_arr_[i] * TSCTimerHelper::cycle_to_ns_scale)};
+        std::chrono::nanoseconds result{static_cast<std::chrono::nanoseconds::rep>(cycles_arr_[i] * scale)};
         return std::chrono::duration_cast<std::chrono::duration<Rep, Period>>(result);
+    }
+
+    static size_t size() {
+        return N;
     }
 
     uint64_t get_cycle(int i) {
         return cycles_arr_[i];
     }
 
-    void dump() {
-        auto fp = fopen("tsc_record", "wb");
-        fwrite(tsc_record_.data(), sizeof(uint64_t), tsc_record_.size(), fp);
-        fclose(fp);
-    }
-
 private:
     uint64_t last_tsc_arr_[N];
     uint64_t cycles_arr_[N];
     std::bitset<N> tracking_;
-    std::vector<uint64_t> tsc_record_;
 };
 
 template <int N, typename Period, typename Rep>

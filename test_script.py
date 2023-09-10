@@ -4,7 +4,7 @@
 import os
 
 if __name__ == '__main__':
-    compile_command = 'g++ -O2 -std=c++11 -o a.out test.cpp'
+    compile_command = 'g++ -O2 -std=c++17 -o a.out test.cpp'
     os.system(compile_command)
     for i in range(1000):
         f = os.popen("./a.out")

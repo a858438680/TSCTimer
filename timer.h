@@ -69,14 +69,10 @@ public:
     }
 
     template <typename... Ns>
+    requires (std::is_same_v<Ns, int> && ...) && (sizeof...(Ns) <= N)
     void track(Ns... track_types) {
         auto tsc = TSCTimerHelper::rdtsc();
-        constexpr auto num_types = sizeof...(Ns);
-        int num_types_arr[num_types] = {track_types...};
-        std::bitset<N> now_tracking;
-        for (size_t i = 0; i < num_types; ++i) {
-            now_tracking.set(num_types_arr[i]);
-        }
+        auto now_tracking = get_tracking_state(track_types...);
         for (int i = 0; i < N; ++i) {
             if (now_tracking.test(i)) {
                 if (not tracking_.test(i)) {
@@ -113,6 +109,17 @@ private:
     uint64_t last_tsc_arr_[N];
     uint64_t cycles_arr_[N];
     std::bitset<N> tracking_;
+
+    template <typename... Ns>
+    constexpr std::bitset<N> get_tracking_state(Ns... track_types) {
+        constexpr auto num_types = sizeof...(Ns);
+        int num_types_arr[num_types] = {track_types...};
+        std::bitset<N> result;
+        for (size_t i = 0; i < num_types; ++i) {
+            result.set(num_types_arr[i]);
+        }
+        return result;
+    }
 };
 
 template <int N, typename Period, typename Rep>

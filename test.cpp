@@ -5,7 +5,7 @@
 #include "timer.h"
 
 int main() {
-    TSCTimer<4, std::chrono::duration<double, std::milli>> timer;
+    TSC::Timer<4, std::milli> timer;
 
     std::vector<int> vec1;
     std::vector<int> vec2;
@@ -17,29 +17,29 @@ int main() {
     std::uniform_int_distribution<> dis2(101, 200);
     std::uniform_int_distribution<> dis3(201, 300);
 
-    timer.track(0);
+    timer.start(0);
     for (int i = 0; i < 1000000; ++i) {
-        timer.track(0, 1);
+        timer.start(1);
         for (int j = 0; j < 100; ++j) {
             vec1.push_back(dis1(gen));
         }
-        timer.track(0, 2);
+        timer.start(2, timer.stop, 1);
         for (int j = 0; j < 100; ++j) {
             vec2.push_back(dis2(gen));
         }
-        timer.track(0, 3);
+        timer.start(3, timer.stop, 2);
         for (int j = 0; j < 100; ++j) {
             vec3.push_back(dis3(gen));
         }
-        timer.track(0);
+        timer.end(3);
     }
-    timer.track();
+    timer.end(0);
 
     // std::cout << std::accumulate(vec1.begin(), vec1.end(), 0) << std::endl;
     // std::cout << std::accumulate(vec2.begin(), vec2.end(), 0) << std::endl;
     // std::cout << std::accumulate(vec3.begin(), vec3.end(), 0) << std::endl;
 
-    for (size_t i = 0; i < timer.size(); ++i) {
-        std::cout << timer.get(i).count() << std::endl;
+    for (int i = 0; i < timer.size(); ++i) {
+        std::cout << timer.get(i) << std::endl;
     }
 }

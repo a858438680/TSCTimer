@@ -40,37 +40,28 @@ cat /proc/cpuinfo | grep -E "constant_tsc|nonstop_tsc"
 ```c++
 TSCTimer<5> timer;
 
-timer.track(0);
+timer.start(0);
 for (int i = 0; i < 100; ++i) {
-    timer.track(0, 1);
+    timer.start(1);
     foo()
-    timer.track(0, 2);
+    timer.start(2, timer.stop, 1);
     for (int j = 0; j < 100; ++j) {
-        timer.track(0, 2, 3);
+        timer.start(3);
         bar1();
-        timer.track(0, 2, 4);
+        timer.start(4, timer.stop, 3);
         bar2();
-        timer.track(0, 2);
+        timer.end(4);
     }
-    timer.track(0);
+    timer.end(2);
 }
-timer.track();
+timer.end(0);
 
 for (size_t i = 0; i < timer.size(); ++i) {
-    std::cout << i << ": " << timer.get(i).count() << std::endl;
+    std::cout << i << ": " << timer.get(i) << std::endl;
 }
 ```
 
-TSCTimer默认使用`std::chrono::duration<double, std::ratio<1>>` 来进行输出，如果你想使用`chrono`提供的其他秒数类型也是很容易的：
-
-```c++
-TSCTimer<5, std::chrono::seconds> timer1;
-TSCTimer<5, std::chrono::milliseconds> timer2;
-TSCTimer<5, std::chrono::microseconds> timer3;
-TSCTimer<5, std::chrono::nanoseconds> timer4;
-```
-
-如果你依然想使用`double`进行输出，可以直接指定单位的比例：
+如果你改变单位比例，可以直接指定单位的比例：
 
 ```c++
 TSCTimer<5, std::milli> timer1;
@@ -78,18 +69,17 @@ TSCTimer<5, std::micro> timer2;
 TSCTimer<5, std::nano> timer3;
 ```
 
-如果你想同时指定单位和数据类型，也是可以的，而且有两种方式：
+如果你想同时指定单位和数据类型，也是可以的：
 
 ```c++
 TSCTimer<5, std::micro, float> timer1;
-TSCTimer<5, std::chrono::duration<float, std::micro>> timer2; // same as timer1
 ```
 ---
 
 ## How does TSCTimer work?
 
 1. 在使用了TSCTimer的程序初始化时就会自动记录TSC的寄存器值和对应的时间。
-2. 在首次调用`TSCTimer::get(int)`成员函数的的时候，会检查时候保存了用于转换TSC值到时间的比例，如果没有，调用`TSCTimerHelper::calibrate()`函数来记录当前的TSC的寄存器值和时间。和程序初始化时记录的时间联合起来，就可以计算出TSC到真是时间的转换比例。
+2. 在首次调用`TSCTimer::get(size_t)`成员函数的的时候，会检查时候保存了用于转换TSC值到时间的比例，如果没有，调用`TSCTimerHelper::calibrate()`函数来记录当前的TSC的寄存器值和时间。和程序初始化时记录的时间联合起来，就可以计算出TSC到真是时间的转换比例。
 3. 这个转换比例是全局唯一的，因此，程序的同一次运行时，不同的TSCTimer实例输出的时间是完全可以比较的。
 4. 在程序的多次运行之间，输出的时间仍然是基本可比的，1s左右的calibrate时间所记录的比例精度大约已经在10e-6的数量级上，如果程序记录的总时间更长，一般来说这种calibrate的方法已经完全足够精确了。
 

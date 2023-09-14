@@ -3,6 +3,7 @@
 #include <atomic>
 #include <bitset>
 #include <chrono>
+#include <tuple>
 #include <vector>
 
 #include <cstring>
